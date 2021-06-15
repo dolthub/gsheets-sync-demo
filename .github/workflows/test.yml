@@ -4,6 +4,7 @@ on:
 env:
   id: '16iUpjhWnPYDo4OUwxv1TlF9x975iPJ2WABgmpoJJdNY'
   remote: 'max-hoffman/dolt_action_test'
+  branch: 'dev'
 jobs:
   plugin_tests:
     runs-on: ubuntu-latest
@@ -33,6 +34,7 @@ jobs:
               dolt table import --update-table -pk id aminals "$file"
             done
           remote: ${{ env.remote }}
+          branch: ${{ env.branch }}
           commit_message: 'Dolt action commit'
           dolthub_credential: ${{ secrets.DOLTHUB_CREDENTIAL }}
           push: true
@@ -42,6 +44,7 @@ jobs:
         if: steps.dolt_import.outputs.commit != ''
         with:
           remote: ${{ env.remote }}
+          branch: ${{ env.branch }}
           dolthub_credential: ${{ secrets.DOLTHUB_CREDENTIAL }}
           before: |
             dolt diff HEAD^ HEAD
