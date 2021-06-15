@@ -1,0 +1,47 @@
+name: Import GSheets into Dolt
+on:
+  workflow_dispatch:
+env:
+  id: '16iUpjhWnPYDo4OUwxv1TlF9x975iPJ2WABgmpoJJdNY'
+  remote: 'max-hoffman/dolt_action_test'
+jobs:
+  plugin_tests:
+    runs-on: ubuntu-latest
+    name: Test Plugin
+    steps:
+      - name: Step 1 - Download Agent Data
+        id: 'sheet_to_csv'
+        uses: dolthub/gsheets-to-csv@v0.5
+        with:
+          creds: ${{ secrets.GOOGLE_CREDENTIAL }}
+          tempdir: ${{ github.workspace }} #/github/workspace
+          sheets: |
+            [
+              { "id": "${{ env.id }}" },
+              { "id": "${{ env.id }}", "title": "Sheet2", "range": "A1:B10" }
+            ]
+      - name: Step 2 - Dolt Import
+        uses: dolthub/dolt-action@v0.5
+        id: 'dolt_import'
+        env:
+          FILES: ${{ steps.sheet_to_csv.outputs.results }}
+        with:
+          before: |
+            file_list=($FILES)
+            head "${file_list[1]}"
+            for file in "${file_list[@]}"; do
+              dolt table import --update-table -pk id aminals "$file"
+            done
+          remote: ${{ env.remote }}
+          commit_message: 'Dolt action commit'
+          dolthub_credential: ${{ secrets.DOLTHUB_CREDENTIAL }}
+          push: true
+      - name: Step 3 - Table Diff
+        uses: dolthub/dolt-action@v0.5
+        id: 'training_diff'
+        if: steps.dolt_import.outputs.commit != ''
+        with:
+          remote: ${{ env.remote }}
+          dolthub_credential: ${{ secrets.DOLTHUB_CREDENTIAL }}
+          before: |
+            dolt diff HEAD^ HEAD
