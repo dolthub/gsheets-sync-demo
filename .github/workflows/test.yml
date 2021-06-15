@@ -18,7 +18,7 @@ jobs:
           sheets: |
             [
               { "id": "${{ env.id }}" },
-              { "id": "${{ env.id }}", "title": "Sheet2", "range": "A1:B10" }
+              { "id": "${{ env.id }}", "title": "Sheet2", "range": "A1:C10" }
             ]
       - name: Step 2 - Dolt Import
         uses: dolthub/dolt-action@v0.5
