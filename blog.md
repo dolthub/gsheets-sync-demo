@@ -7,11 +7,11 @@ authorHref: "https://www.dolthub.com/team#max"
 
 # Introduction
 
-We will learn how to version Google Sheets data using Dolt and GitHub
-Actions in this blog. This is intended for teams who use Google Sheets
-tables to train models, and might benefit from a Git Pull-Request
-process for managing data changes over time. We will touch on branch,
-diff, merge and rollback operations in our demo.
+We will learn how to version control Google Sheets data using Dolt and GitHub
+Actions in this blog. This is intended for teams who might benefit from a
+Pull-Request process for managing Google Sheets data changes, complete with strong typing,
+lineage tracing and diff management. We will touch on branch,
+diff, merge and rollback operations with a simple tutorial.
 
 # Background
 
@@ -24,13 +24,14 @@ analysts informed and better poised to communicate with stakeholders.
 
 These are all useful pieces of technology, but they are also complex and
 can make the task of understanding data patterns more intimidating.
-Beneath the nose of all this math is the data diff: seeing how data
-changed from one version to another. Diffs are a simple and crude
-hammer, but seeing a summary of row changes is always useful, even if
-only for use cases like tracking image metadata.
+The data diff is on the opposite end of the math complexity spectrum, directly showing how data
+changed from one version to another. Diffs are simple and crude,
+but seeing a summary of row changes is always useful. Even math heavy
+domains like computer vision stand to benefit from tracking image metadata
+over time.
 
 Dolt is an SQL database with Git styled versioning. The Dolt storage
-layer was designed to support branching, diffing and merging as first
+layer is designed to support branching, diffing and merging as first
 class citizens. Avoiding data duplication is helpful, but as we hope to
 show in this blog, the diffing, reproducibility and tracing afforded by
 commit graphs improve data pipelines in the same way code versioning
@@ -38,23 +39,23 @@ strengthens web applications.
 
 # Data Syncing
 
-Today we consider the use case where data management is divided between
-analysts and data scientists. Analysts work with data and train models
-to identify and improve bad data. Data scientists iterate on model
-architectures and track production quality. Analysts handoff cleaned
-data to their data scientists’ best models. Google Sheets is an
-organizational dividing line between two expert camps.
+Today we consider a use case where data management is divided between
+analysts and data scientists. Analysts edit data and train models with
+pre-set hyperparameters. Data scientists refine model
+architectures and track production quality. The two experts collaborate
+to deliver the clean data and accurate models. Google Sheets is an
+organizational dividing line between the two camps.
 
 This handoff creates several problems. The data is always changing
 because analysts are always improving, mixing and matching training
 rows. Understanding how data differences impact successive model
-versions is not feasible in the first setup. Rollbacks are also limited,
+versions is not feasible in the first setup. Rollbacks are limited,
 given the difficulty reproducing past training phases. Productionizing
-this customer’s model in practice also requires packing dozens of
-compositional models into one docker image. In the event of a
+a model in in this instance requires packing dozens of
+adaptor layers and one base model into a docker image. In the event of a
 regression, our options are either rebuild everything with the newest
 data versions (assuming the offending model was fixed), or rollback to
-the last built image and clobber every model upgrade.
+the last built image and clobber every adaptor upgrade.
 
 The next iteration of this data process adds versioning between analysts
 and data scientists. If we were interested strictly in reproducibility,
@@ -80,11 +81,13 @@ here](https://github.com/dolthub/gsheets-sync-demo/blob/master/.github/workflows
 includes three steps:
 
 
-Download sheets into temporary CSV files
+- Download sheets into temporary CSV files
 ([dolthub/gsheets-to-csv](https://github.com/dolthub/gsheets-to-csv)).
-Import the CSV files into a Dolt table and push results to DoltHub
+
+- Import the CSV files into a Dolt table and push results to DoltHub
 ([dolthub/dolt-action](https://github.com/dolthub/dolt-action)).
-Log the import diff (if any) in our workflow logs.
+
+- Log the import diff (if any) in our workflow logs.
 
 ```yml
 name: Import GSheets into Dolt
@@ -197,7 +200,7 @@ downloading sheet: ***'id':
 
 ## Step 2:
 
-Head the first file, and import both into a Dolt repository.
+Clone the repo, head the first file, and import both files into a Dolt repository.
 
 ```bash
 + dolt clone max-hoffman/dolt_action_test -b master
@@ -302,37 +305,38 @@ And view the diff in DoltHub before merging to master:
 # Technical Details
 
 Comfortably editing YAML files is one speedbump of GitHub actions. I
-tested a lot of code locally with the [act
+tested code locally with the [act
 tool](https://github.com/nektos/act), which allows you to test workflows
 without hopping between your terminal and the GitHub Actions website.
 
 The local `act` experience has small discrepancies between running
 workflows on GitHub’s platform. One discrepancy relevant to our demo
-workflow concerns temporary file persistence between jobs. Act is
-designed to mount local files in the workflow volume to test work in
-progress. GitHub actions also does this, but it can be confusing to keep
+concerns temporary file persistence between jobs. Act is
+designed to mount local files in the workflow volume. This lets users test changes
+without needing to rebuild images between runs. GitHub actions also
+mounts volumes, but with different rules. It can be confusing to keep
 track of which directories are mounted where, especially when `use:
 actions/checkout@2` is included in a workflow.
 
-A few things are important to understand:
+A few things are important to remember:
 
-GitHub Actions differentiates between `uses` and `run` steps. A step can
+- GitHub Actions differentiates between `uses` and `run` steps. A step can
 only be one or the other. A `run` step is the default workflow runtime,
 presumably a docker image with a set of workspace and home directories.
 A `uses` step is a docker-in-docker context that mounts directories into
 a new container.
-The default working directory for a workflow in the parent container is
+
+- The default working directory for a workflow in the parent container is
 either `/github/workspace`, or a separate repo directory if `uses:
 actions/checkout@2` precedes a workflow step.
-The working directory of a child container (a `uses` step) is always
+
+- The working directory of a child container (a `uses` step) is always
 `/github/workspace`. A checkout step changes the parent container
 working directory and the`${{ github.workspace }}` context variable, but
 the home directory will still mount to `/github/workspace` in child
 containers of `uses` blocks.
 
-[print directory examples to clarify the above]
-
-A plugin user is mainly concerned with the where temporary files, and
+A plugin user is mainly concerned with where temporary files are, and
 how to access custom scripts in a `uses: dolthub/dolt-action`.
 
 Our demo workflow steps are `uses` blocks, so files are written to
@@ -340,8 +344,8 @@ Our demo workflow steps are `uses` blocks, so files are written to
 block without any other changes, you would error for referencing
 non-existent file paths.
 
-To fix this problem and pass temporary files to a `run` block, you would
-use relative paths.
+To fix this problem and pass temporary files to a `run` block, you might
+set the plugin `tempdir: .` and write relative paths.
 
 Custom scripts in a `dolthub/dolt-action` are relative to
 `/github/workspace`, the mount target of a `uses` step. You could use a
@@ -368,7 +372,7 @@ with:
 ```
 
 Both Google Sheets and GitHub Actions have memory limits. Individual
-Google Sheets were limited to 20MB and GitHub Action runners allotted
+Google Sheets are limited to 20MB and GitHub Action runners allotted
 1GB of memory at the time of writing.
 
 # Room For Improvement
@@ -393,6 +397,12 @@ and model management responsibilities are divided between teams who
 stand to benefit from data versioning, a branch and merge PR process to
 standardize data handoff, and diffs/rollbacks for responding to
 production regressions.
+
+Bringing order to data management is essential for
+improving organizational data quality, and by extension model and pipeline
+quality. A Pull Request process bring data diffs and lineage front and center,
+makign it easier to understand how data is changing and collaborate on QA
+between vesions.
 
 If you are interested in trying these plugins yourself, you can find
 [dolthub/gsheets-to-csv](https://github.com/dolthub/gsheets-to-csv) and
